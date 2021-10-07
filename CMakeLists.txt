@@ -9,7 +9,7 @@ find_package(OpenCV REQUIRED)
 
 find_package(gazebo REQUIRED)
 
-include_directories(${OpenCV_INCLUDE_DIRS}) # Not needed for CMake >= 2.8.11
+include_directories(${OpenCV_INCLUDE_DIRS})
 include_directories(${GAZEBO_PROTO_INCLUDE_DIRS} ${GAZEBO_INCLUDE_DIRS} src)
 
 add_executable(robot_control main.cpp)
