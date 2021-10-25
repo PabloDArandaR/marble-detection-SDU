@@ -13,14 +13,11 @@ namespace comm
         std::size_t height = msg->image().height();
         const char *data = msg->image().data().c_str();
         cv::Mat im(int(height), int(width), CV_8UC3, const_cast<char *>(data));
-
-        std::cout << "[CAMERA] Received image \n";
-        std::cout << "[CAMERA] Dimensions of the image are:  " << int(height) << ", " << int(width) << std::endl;
-
         im = im.clone();
         cv::cvtColor(im, im, cv::COLOR_RGB2BGR);
 
         this->image = im;
+        imageReceived = true;
     }
 
     cv::Mat cameraInterface::checkImage()
