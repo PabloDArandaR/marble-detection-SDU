@@ -17,6 +17,10 @@ const int key_esc = 27;
 const int maxDev {5};
 const int minDev {0};
 const double incrementDev {0.02};
+const int param1 {100};
+const int param2 {40};
+const int maxRadius {200};
+const int minRadius {50};
 
 int main(int argc, char ** argv)
 {
@@ -33,7 +37,6 @@ int main(int argc, char ** argv)
     if (argc > 1)
     {
         show_image = std::strtol(argv[1], nullptr,10);
-        std::cout << "value of input: " << show_image << std::endl;
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +65,8 @@ int main(int argc, char ** argv)
     while(true)
     {
         // Declare the local variables
-        cv::Mat gauss, median, blurred, sharp, laplacian, used, original;
+        cv::Mat gauss, median, blurred, sharp, laplacianGauss, laplacianBlur, laplacianMedian, laplacian, used, original;
+        std::vector<cv::Vec3f> circles;
 
         // Make it capable to read the image 
         mutex.lock();
@@ -73,10 +77,12 @@ int main(int argc, char ** argv)
         if ((key == key_up) && ((stdDev + incrementDev) <= maxDev))
         {
             stdDev += incrementDev;
+            std::cout << "Incrementing standard deviation: " << stdDev << std::endl;
         }
-        if ((key == key_down) && ((stdDev - incrementDev) <= minDev))
+        if ((key == key_down) && ((stdDev - incrementDev) >= minDev))
         {
             stdDev -= incrementDev;
+            std::cout << "Reducing standard deviation: " << stdDev << std::endl;
         }
         if (key == key_esc)
         {
@@ -88,35 +94,61 @@ int main(int argc, char ** argv)
         //TODO Implement Rotation Mask
 
         // Don't do anything if you haven't received an image
-        if (camera->receptionAccomplished()) {continue;}
+        if (!(camera->receptionAccomplished())) {continue;}
 
         // Obtain the image and convert it to grayscale
         original = camera->checkImage();
-        cv::cvtColor(original, image_gray, cv::COLOR_RGB2GRAY);
+        cv::cvtColor(original, image_gray, cv::COLOR_BGR2GRAY);
 
         // Basic filterings to check which one is better
         used = original;
         cv::GaussianBlur(used, filtered, cv::Size(kernel_size, kernel_size), stdDev);
         cv::blur(used, blurred, cv::Size(kernel_size, kernel_size));
-        cv::medianBlur(used, median, kernel_size);
+        cv::medianBlur(filtered, median, kernel_size);
+        cv::GaussianBlur(image_gray, image_gray, cv::Size(kernel_size, kernel_size), stdDev);
+        //cv::blur(image_gray, image_gray, cv::Size(kernel_size, kernel_size));
+        //cv::medianBlur(image_gray, image_gray, kernel_size);
 
-        // Segmentation/recognition
+        // First derivative use
+        /* cv::Mat horizontal, vertical;
+        cv::Sobel(image_gray, horizontal, CV_32F,1,0);
+        cv::Sobel(image_gray, vertical, CV_32F,0,1);
+        vertical.convertTo(vertical, CV_8U);
+        horizontal.convertTo(horizontal, CV_8U);
+        cv::Mat sum = horizontal + vertical; */
 
+        // Second derivative use
+        /*image_gray.convertTo(image_gray, CV_32F);
+        cv::Laplacian(image_gray, laplacian, CV_32F, 3);
+        image_gray -= 0.3*laplacian;
+        image_gray.convertTo(image_gray, CV_8U); */
 
+        // Segmentation/recognition of marbles
+        
+        cv::HoughCircles(image_gray, circles, cv::HOUGH_GRADIENT, 1,
+                 image_gray.rows/16,
+                 param1, param2, minRadius, maxRadius 
+        );
 
         // Control of the robot based on the images
 
+
         // Show the pictures
-        std::cout << "Inside here \n";
-        mutex.lock();
-        cv::imshow("Original image.", original);
-        mutex.unlock();
-        mutex.lock();
-        cv::imshow("Gaussian blur", filtered);
-        mutex.unlock();
-        mutex.lock();
-        cv::imshow("Median blur", median);
-        mutex.unlock();
+
+        if (show_image){
+            // Draw circles detected in each image
+            for (int i = 0; i < circles.size(); i++)
+            {
+                // circle center
+                cv::circle( image_gray, cv::Point(circles[i][0], circles[i][1]), 1, cv::Scalar(0,100,100), 3, cv::LINE_AA);
+                // circle outline
+                circle( image_gray, cv::Point(circles[i][0], circles[i][1]), circles[i][2], cv::Scalar(255,0,255), 3, cv::LINE_AA);
+            }
+
+            mutex.lock();
+            cv::imshow("Show gray image", image_gray);
+            mutex.unlock();
+        }
     }
 
     // Turn off gazebo
