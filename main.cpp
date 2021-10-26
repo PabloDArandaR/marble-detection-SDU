@@ -2,6 +2,7 @@
 #include <gazebo/msgs/msgs.hh>
 #include <gazebo/transport/transport.hh>
 #include <opencv2/opencv.hpp>
+#include <opencv2/calib3d.hpp>
 #include <iostream>
 #include <stdlib.h>  // for strtol
 
@@ -14,23 +15,24 @@ const int key_down = 84;
 const int key_right = 83;
 const int key_esc = 27;
 
-const int maxDev {5};
-const int minDev {0};
-const double incrementDev {0.02};
-const int param1 {100};
-const int param2 {40};
+const int maxParam1 {300};
+const int minParam1 {1};
+const double incrementParam {1};
+int param1 {100};
+int param2 {30};
 const int maxRadius {200};
-const int minRadius {50};
+const int minRadius {20};
 
 int main(int argc, char ** argv)
 {
     // Declaration of global variables
     double stdDev {0.02};
     const double mean {0};
-    const int kernel_size {3};
-    bool show_image {false};
+    const int kernel_size {5};
+    bool show_image {true};
     cv::Mat image, image_gray, filtered;
     comm::cameraInterface * camera (new comm::cameraInterface);
+    
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Argc check
@@ -60,13 +62,25 @@ int main(int argc, char ** argv)
 
     // TODO Create publisher to publish the location of the closest marbel
 
+    // Pre-compute calibration matrixes
+    cv::Matx33f K{1047, 0, 0.5*320,
+                  0, 1047, 0.5*240,
+                  0, 0    , 1};
+    cv::Vec<float, 5> k(-0.25, 0.12, -0.00028, 0.00005, 0); // distortion coefficients
+    cv::Size frameSize(320, 240);
+    cv::Mat mapX, mapY;
+    std::cout << "The matrix K: \n" << K << std::endl;
+    std::cout << "The vector k:\n" << k << std::endl;
+    cv::initUndistortRectifyMap(K, k, cv::Matx33f::eye(), K, frameSize, CV_32FC1,
+                              mapX, mapY);
+
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Control loop
     while(true)
     {
         // Declare the local variables
-        cv::Mat gauss, median, blurred, sharp, laplacianGauss, laplacianBlur, laplacianMedian, laplacian, used, original;
-        std::vector<cv::Vec3f> circles;
+        cv::Mat gauss, median, blurred, sharp, laplacianGauss, laplacianBlur, laplacianMedian, laplacian, used, original, undistorted;
+        std::vector<cv::Vec3f> circles, circlesLap;
 
         // Make it capable to read the image 
         mutex.lock();
@@ -74,15 +88,15 @@ int main(int argc, char ** argv)
         mutex.unlock();
 
         // TODO Conditions to check which key has been pressed to update the adequate values
-        if ((key == key_up) && ((stdDev + incrementDev) <= maxDev))
+        if ((key == key_up) && ((param1 + incrementParam) <= maxParam1))
         {
-            stdDev += incrementDev;
-            std::cout << "Incrementing standard deviation: " << stdDev << std::endl;
+            param1 += incrementParam;
+            std::cout << "Incrementing param 1: " << param1 << std::endl;
         }
-        if ((key == key_down) && ((stdDev - incrementDev) >= minDev))
+        if ((key == key_down) && ((param1 - incrementParam) >= minParam1))
         {
-            stdDev -= incrementDev;
-            std::cout << "Reducing standard deviation: " << stdDev << std::endl;
+            param1 -= incrementParam;
+            std::cout << "Reducing param 1: " << param1 << std::endl;
         }
         if (key == key_esc)
         {
@@ -96,39 +110,36 @@ int main(int argc, char ** argv)
         // Don't do anything if you haven't received an image
         if (!(camera->receptionAccomplished())) {continue;}
 
-        // Obtain the image and convert it to grayscale
+        // Obtain the image and correct distortion
         original = camera->checkImage();
-        cv::cvtColor(original, image_gray, cv::COLOR_BGR2GRAY);
+        //cv::undistort(original_, original,K,k);
+        cv::remap(original, undistorted, mapX, mapY, cv::INTER_LANCZOS4);
+        std::cout << "After the undistortion:  " << undistorted.channels() << std::endl;
+
+        // Create copy of original image in grayscale
+        cv::cvtColor(undistorted, image_gray, cv::COLOR_BGR2GRAY);
 
         // Basic filterings to check which one is better
-        used = original;
-        cv::GaussianBlur(used, filtered, cv::Size(kernel_size, kernel_size), stdDev);
-        cv::blur(used, blurred, cv::Size(kernel_size, kernel_size));
-        cv::medianBlur(filtered, median, kernel_size);
-        cv::GaussianBlur(image_gray, image_gray, cv::Size(kernel_size, kernel_size), stdDev);
-        //cv::blur(image_gray, image_gray, cv::Size(kernel_size, kernel_size));
-        //cv::medianBlur(image_gray, image_gray, kernel_size);
+        cv::medianBlur(undistorted, median, kernel_size);
+        cv::cvtColor(median, median, cv::COLOR_BGR2GRAY); // For further analysis
 
-        // First derivative use
-        /* cv::Mat horizontal, vertical;
-        cv::Sobel(image_gray, horizontal, CV_32F,1,0);
-        cv::Sobel(image_gray, vertical, CV_32F,0,1);
-        vertical.convertTo(vertical, CV_8U);
-        horizontal.convertTo(horizontal, CV_8U);
-        cv::Mat sum = horizontal + vertical; */
-
-        // Second derivative use
-        /*image_gray.convertTo(image_gray, CV_32F);
-        cv::Laplacian(image_gray, laplacian, CV_32F, 3);
-        image_gray -= 0.3*laplacian;
-        image_gray.convertTo(image_gray, CV_8U); */
+        // Edge detection
+        median.convertTo(median, CV_32F);
+        cv::Laplacian(median, laplacian, CV_32F, 5);
+        median = median - 0.1*laplacian;
+        median.convertTo(median, CV_8U);
 
         // Segmentation/recognition of marbles
-        
-        cv::HoughCircles(image_gray, circles, cv::HOUGH_GRADIENT, 1,
-                 image_gray.rows/16,
+        cv::HoughCircles(median, circles, cv::HOUGH_GRADIENT, 1,
+                 median.rows/16,
                  param1, param2, minRadius, maxRadius 
         );
+        /* cv::HoughCircles(laplacian, circlesLap, cv::HOUGH_GRADIENT, 1,
+                 laplacian.rows/16,
+                 param1, param2, minRadius, maxRadius 
+        ); */
+
+        std::cout << "Number of circles detected is: " << circles.size() << std::endl;
 
         // Control of the robot based on the images
 
@@ -140,13 +151,22 @@ int main(int argc, char ** argv)
             for (int i = 0; i < circles.size(); i++)
             {
                 // circle center
-                cv::circle( image_gray, cv::Point(circles[i][0], circles[i][1]), 1, cv::Scalar(0,100,100), 3, cv::LINE_AA);
+                cv::circle( median, cv::Point(circles[i][0], circles[i][1]), 1, cv::Scalar(0,100,100), 3, cv::LINE_AA);
                 // circle outline
-                circle( image_gray, cv::Point(circles[i][0], circles[i][1]), circles[i][2], cv::Scalar(255,0,255), 3, cv::LINE_AA);
+                cv::circle( median, cv::Point(circles[i][0], circles[i][1]), circles[i][2], cv::Scalar(255,0,255), 1, cv::LINE_AA);
             }
 
             mutex.lock();
-            cv::imshow("Show gray image", image_gray);
+            cv::imshow("Original", original);
+            mutex.unlock();
+            mutex.lock();
+            cv::imshow("Undistorted", undistorted);
+            mutex.unlock();
+            mutex.lock();
+            cv::imshow("Median", median);
+            mutex.unlock();
+            mutex.lock();
+            cv::imshow("Laplacian", laplacian);
             mutex.unlock();
         }
     }
