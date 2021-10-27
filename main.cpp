@@ -141,6 +141,9 @@ int main(int argc, char ** argv)
 
         std::cout << "Number of circles detected is: " << circles.size() << std::endl;
 
+        // Using the LIDAR to find the marbles in the range
+        
+
         // Control of the robot based on the images
 
 
