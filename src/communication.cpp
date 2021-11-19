@@ -1,13 +1,15 @@
 #include <opencv2/opencv.hpp>
-
+#include <algorithm>
+#include <iostream>
 #include "communication.hpp"
+
+#ifndef COMM_CPP_GUARD
+#define COMM_CPP_GUARD
 
 namespace comm
 {
-    cameraInterface::cameraInterface() : imageReceived {false} 
-        {};
 
-    void cameraInterface::cameraCallback(ConstImageStampedPtr &msg)
+    void cameraInterface::callbackMsg(ConstImageStampedPtr &msg)
     {
         std::size_t width = msg->image().width();
         std::size_t height = msg->image().height();
@@ -16,17 +18,32 @@ namespace comm
         im = im.clone();
         cv::cvtColor(im, im, cv::COLOR_RGB2BGR);
 
-        this->image = im;
-        imageReceived = true;
+        this->elementReceived = im;
+        received = true;
     }
 
-    cv::Mat cameraInterface::checkImage()
-    {
-        return this->image;
-    }
+    void lidarInterface::callbackMsg(ConstLaserScanStampedPtr &msg) {
 
-    bool cameraInterface::receptionAccomplished()
-    {
-        return this->imageReceived;
+        this->elementReceived.angle_min = float(msg->scan().angle_min());
+        this->elementReceived.angle_increment = float(msg->scan().angle_step());
+        this->elementReceived.range_min = float(msg->scan().range_min());
+        this->elementReceived.range_max = float(msg->scan().range_max());
+        this->elementReceived.nranges = msg->scan().ranges_size();
+        this->elementReceived.nintensities = msg->scan().intensities_size();
+
+        for (int i = 0; i < this->elementReceived.nranges; i++)
+        {
+            if (this->elementReceived.ranges.size() <= i)
+            {
+                this->elementReceived.ranges.push_back(std::min(float(msg->scan().ranges(i)), this->elementReceived.range_max));
+            }
+            else
+            {
+                this->elementReceived.ranges[i] = std::min(float(msg->scan().ranges(i)), this->elementReceived.range_max);
+            }
+        }
+        this->received = true;
     }
 }
+
+#endif
