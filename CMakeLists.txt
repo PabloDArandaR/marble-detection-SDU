@@ -4,13 +4,12 @@ project(controller)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-
 find_package(OpenCV REQUIRED)
 
 find_package(gazebo REQUIRED)
 
 include_directories(${OpenCV_INCLUDE_DIRS})
-include_directories(${GAZEBO_PROTO_INCLUDE_DIRS} ${GAZEBO_INCLUDE_DIRS} src)
+include_directories(${GAZEBO_PROTO_INCLUDE_DIRS} ${GAZEBO_INCLUDE_DIRS})
 
 add_executable(robot_control main.cpp)
 target_link_libraries(robot_control ${OpenCV_LIBS} ${GAZEBO_PROTO_LIBRARIES} ${GAZEBO_LIBRARIES})
