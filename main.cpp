@@ -24,6 +24,7 @@ int param2 {35};
 const int maxRadius {200};
 const int minRadius {20};
 const int maxLengthCircleVector {20};
+const double f {0.01};
 
 int main(int argc, char ** argv)
 {
@@ -83,8 +84,9 @@ int main(int argc, char ** argv)
     while(true)
     {
         // Declare the local variables
-        cv::Mat gauss, median, blurred, sharp, laplacianGauss, laplacianBlur, laplacianMedian, laplacian, used, original, undistorted, canny;
+        cv::Mat gauss, median, blurred, sharp, laplacianGauss, laplacianBlur, laplacianMedian, laplacian, used, original, undistorted, canny, hsv;
         std::vector<cv::Vec3f> circles, circlesLap;
+        comm::lidarMsg lidarFrame;
 
         // Make it capable to read the image 
         mutex.lock();
@@ -92,16 +94,6 @@ int main(int argc, char ** argv)
         mutex.unlock();
 
         // TODO Conditions to check which key has been pressed to update the adequate values
-        if ((key == key_up) && ((param1 + incrementParam) <= maxParam1))
-        {
-            param1 += incrementParam;
-            std::cout << "Incrementing param 1: " << param1 << std::endl;
-        }
-        if ((key == key_down) && ((param1 - incrementParam) >= minParam1))
-        {
-            param1 -= incrementParam;
-            std::cout << "Reducing param 1: " << param1 << std::endl;
-        }
         if (key == key_esc)
         {
             break;
@@ -109,19 +101,22 @@ int main(int argc, char ** argv)
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Initial filtering of the image
-        //TODO Implement Rotation Mask
 
         // Don't do anything if you haven't received an image
         if (!(camera->receptionAccomplished()) | !(lidar->receptionAccomplished())) {continue;}
 
-        // Obtain the image and correct distortion
+        // Obtain the messages
         original = camera->checkReceived();
+        lidarFrame = lidar->checkReceived();
+
+        // Undistort the image
         //cv::undistort(original_, original,K,k);
         cv::remap(original, undistorted, mapX, mapY, cv::INTER_LANCZOS4);
         std::cout << "After the undistortion:  " << undistorted.channels() << std::endl;
 
         // Create copy of original image in grayscale
         cv::cvtColor(undistorted, image_gray, cv::COLOR_BGR2GRAY);
+        cv::cvtColor(undistorted, hsv, cv::COLOR_RGB2HSV);
 
         // Basic filterings to check which one is better
         cv::medianBlur(undistorted, median, kernel_size);
@@ -139,14 +134,15 @@ int main(int argc, char ** argv)
                  canny.rows/16,
                  param1, param2, minRadius, maxRadius 
         );
-
         std::cout << "Number of circles detected is: " << circles.size() << std::endl;
 
         // Filtering of the circles
-        //pushBeginning<std::vector<cv::Vec3f>>(lastCircles, circles, maxLengthCircleVector);
         pushBeginning<circleAvg>(meanCenter, averageCircle(circles), maxLengthCircleVector);
 
         // Using the LIDAR to find the marbles in the range
+        // Identify the angle at which the marble is.
+
+        //double angle = 
         
 
         // Control of the robot based on the images
@@ -184,7 +180,7 @@ int main(int argc, char ** argv)
             mutex.unlock();
             mutex.lock();
             cv::imshow("Canny edge", canny);
-            mutex.unlock();
+            mutex.unlock(); 
         }
     }
 
