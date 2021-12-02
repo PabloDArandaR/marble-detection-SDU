@@ -2,6 +2,9 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/calib3d.hpp>
 
+#ifndef VECTOR_GUARD_CPP
+#define VECTOR_GUARD_CPP
+
 struct circleAvg
 {
     int x_center,y_center,nCircles,radius;
@@ -19,6 +22,8 @@ struct circle
 circle lowPassFilter(std::vector<circleAvg> inputs, float cutoff, float sampleFrequency)
 {
     circle result;
+
+    return result;
 }
 
 template <typename T>
@@ -58,3 +63,5 @@ circleAvg averageCircle(std::vector<cv::Vec3f> input)
 
     return result;
 }
+
+#endif

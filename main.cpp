@@ -6,6 +6,7 @@
 #include <iostream>
 #include <stdlib.h>  // for strtol
 #include <math.h>
+#include <list>
 
 #include "src/communication.cpp"
 #include "src/vectorMod.cpp"
@@ -38,11 +39,13 @@ int main(int argc, char ** argv)
     const int kernel_size {3};
     bool show_image {true};
     float realRadius = 0.5;
+    comm::point marblePoint = {5,0,0.5};
     std::vector<std::vector<cv::Vec3f>> lastCircles;
     std::vector<circleAvg> meanCenter;
     cv::Mat image, image_gray, filtered;
     comm::cameraInterface * camera (new comm::cameraInterface);
     comm::lidarInterface * lidar (new comm::lidarInterface);
+    comm::poseInterface * poseRobot (new comm::poseInterface);
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Argc check
@@ -63,6 +66,7 @@ int main(int argc, char ** argv)
     // Create subscribers to listen to Gazebo topics
     gazebo::transport::SubscriberPtr cameraSubscriber = node->Subscribe("~/pioneer2dx/camera/link/camera/image", &comm::cameraInterface::callbackMsg, camera);
     gazebo::transport::SubscriberPtr lidarSubscriber = node->Subscribe("~/pioneer2dx/hokuyo/link/laser/scan", &comm::lidarInterface::callbackMsg, lidar);
+    gazebo::transport::SubscriberPtr poseSubscriber = node->Subscribe("/gazebo/default/pose/info", &comm::poseInterface::callbackMsg, poseRobot);
 
     // Capability to publish to reset the world
     gazebo::transport::PublisherPtr worldPublisher = node->Advertise<gazebo::msgs::WorldControl>("~/world_control");
@@ -72,6 +76,12 @@ int main(int argc, char ** argv)
     worldPublisher->Publish(controlMessage);
 
     // TODO Create publisher to publish the location of the closest marbel
+    /* std::list<std::string> listOfTopics = gazebo::transport::getAdvertisedTopics();
+    std::cout << "  List of topics:" << std::endl;
+    for (auto& elm: listOfTopics)
+    {
+        std::cout << "    -" << elm << std::endl;
+    } */
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Pre-compute calibration matrixes
@@ -110,11 +120,14 @@ int main(int argc, char ** argv)
             break;
         }
 
+        //std::cout << " [NOTE] The list of possible messages is:  " << gazebo::transport::getAdvertisedTopics() << std::endl;
+        //std::cout << " [NOTE] The message that is begin published is of type:  " <<  << std::endl;
+
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Initial filtering of the image
 
         // Don't do anything if you haven't received an image
-        if (!(camera->receptionAccomplished()) | !(lidar->receptionAccomplished())) {continue;}
+        if (!(camera->receptionAccomplished()) | !(lidar->receptionAccomplished()) | !(poseRobot->receptionAccomplished())) {continue;}
 
         // Obtain the messages
         original = camera->checkReceived();
@@ -155,7 +168,8 @@ int main(int argc, char ** argv)
         if (circles.size() > 0)
         {
             double distance = distanceToMarble(average, realRadius, f);
-            std::cout << "[NOTE] Distance to marble is:  " << distance << std::endl;
+            std::cout << "[NOTE] Calculated distance to marble is:  " << distance << std::endl;
+            std::cout << "[NOTE] Real distance to marble is:        " << poseRobot->checkReceived().distance(marblePoint) << std::endl;
             std::cout << "";
         }
 
@@ -202,6 +216,8 @@ int main(int argc, char ** argv)
             cv::imshow("Canny edge", canny);
             mutex.unlock(); 
         }
+
+        std::cout << " [NOTE] Type of the relevant message: " << gazebo::transport::getTopicMsgType("/gazebo/default/pose/info") << std::endl;
     }
 
     // Turn off gazebo

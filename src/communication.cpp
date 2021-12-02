@@ -44,6 +44,29 @@ namespace comm
         }
         this->received = true;
     }
+
+    void printMessage(ConstPosesStampedPtr &msg){
+        for (int i = 0; i < msg->pose_size(); i++)
+        {
+            std::cout << "Name: " << msg->pose(i).name() << std::endl;
+        }
+    };
+
+    void poseInterface::callbackMsg(ConstPosesStampedPtr &msg)
+    {
+        for (int i = 0; i < msg->pose_size(); i++)
+        {
+            if (msg->pose(i).name() == "pioneer2dx::camera::link")
+            {
+                this->elementReceived.x = msg->pose(i).position().x();
+                this->elementReceived.y = msg->pose(i).position().y();
+                this->elementReceived.z = msg->pose(i).position().z();
+            }
+        }
+
+        received = true;
+    }
+
 }
 
 #endif

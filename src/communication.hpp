@@ -3,6 +3,7 @@
 #include <gazebo/msgs/msgs.hh>
 #include <gazebo/transport/transport.hh>
 #include <algorithm>
+#include <math.h>
 
 #ifndef COMM_GUARD
 #define COMM_GUARD
@@ -14,6 +15,16 @@ namespace comm
         float angle_min, angle_increment, range_min, range_max;
         int nranges, nintensities;
         std::vector<int> ranges;
+    };
+
+    struct point
+    {
+        float x,y,z;
+
+        float distance(point input)
+        {
+            return sqrt(pow(input.x - x, 2) + pow(input.y - y, 2) + pow(input.z - z, 2));
+        }
     };
 
     template <typename T>
@@ -50,6 +61,12 @@ namespace comm
     {
         public:
             void callbackMsg(ConstLaserScanStampedPtr &msg);
+    };
+
+    class poseInterface : public Interface<point>
+    {
+        public:
+            void callbackMsg(ConstPosesStampedPtr &msg);
     };
 }
 
