@@ -5,9 +5,11 @@
 #include <opencv2/calib3d.hpp>
 #include <iostream>
 #include <stdlib.h>  // for strtol
+#include <math.h>
 
 #include "src/communication.cpp"
 #include "src/vectorMod.cpp"
+#include "src/geometry.cpp"
 
 static boost::mutex mutex;
 const int key_left = 81;
@@ -26,13 +28,16 @@ const int minRadius {20};
 const int maxLengthCircleVector {20};
 const double f {0.01};
 
+const float width {320.0}, height {240.0}, fov {1.047};
+
 int main(int argc, char ** argv)
 {
     // Declaration of global variables
     double stdDev {0.02};
     const double mean {0};
-    const int kernel_size {7};
+    const int kernel_size {3};
     bool show_image {true};
+    float realRadius = 0.5;
     std::vector<std::vector<cv::Vec3f>> lastCircles;
     std::vector<circleAvg> meanCenter;
     cv::Mat image, image_gray, filtered;
@@ -70,8 +75,12 @@ int main(int argc, char ** argv)
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Pre-compute calibration matrixes
-    cv::Matx33f K{1047, 0, 0.5*320,
-                  0, 1047, 0.5*240,
+    float f {width/(2*tan(fov/2))};
+    cv::Matx34f KA{f, 0, 0.5*320,0,
+                  0, f, 0.5*240,0,
+                  0, 0    , 1,0};
+    cv::Matx33f K{f, 0, 0.5*320,
+                  0, f, 0.5*240,
                   0, 0    , 1};
     cv::Vec<float, 5> k(-0.25, 0.12, -0.00028, 0.00005, 0); // distortion coefficients
     cv::Size frameSize(320, 240);
@@ -83,6 +92,8 @@ int main(int argc, char ** argv)
     // Control loop
     while(true)
     {
+        std::cout << " ---------------------------------------------------------------------------\n";
+
         // Declare the local variables
         cv::Mat gauss, median, blurred, sharp, laplacianGauss, laplacianBlur, laplacianMedian, laplacian, used, original, undistorted, canny, hsv;
         std::vector<cv::Vec3f> circles, circlesLap;
@@ -112,11 +123,9 @@ int main(int argc, char ** argv)
         // Undistort the image
         //cv::undistort(original_, original,K,k);
         cv::remap(original, undistorted, mapX, mapY, cv::INTER_LANCZOS4);
-        std::cout << "After the undistortion:  " << undistorted.channels() << std::endl;
 
         // Create copy of original image in grayscale
         cv::cvtColor(undistorted, image_gray, cv::COLOR_BGR2GRAY);
-        cv::cvtColor(undistorted, hsv, cv::COLOR_RGB2HSV);
 
         // Basic filterings to check which one is better
         cv::medianBlur(undistorted, median, kernel_size);
@@ -125,9 +134,11 @@ int main(int argc, char ** argv)
         // Edge detection
         median.convertTo(median, CV_32F);
         cv::Laplacian(median, laplacian, CV_32F, 5);
-        median = median - 0.1*laplacian;
+        // median = median - 0.1*laplacian;
         median.convertTo(median, CV_8U);
-        cv::Canny(median, canny, 400, 450, 5, true);
+        cv::Canny(median, canny, 260, 300, 5, true);
+        cv::GaussianBlur(canny, canny, cv::Size(3,3), 1);
+        //median = median - 0.3*canny;
 
         // Segmentation/recognition of marbles
         cv::HoughCircles(canny , circles, cv::HOUGH_GRADIENT, 1,
@@ -137,12 +148,21 @@ int main(int argc, char ** argv)
         std::cout << "Number of circles detected is: " << circles.size() << std::endl;
 
         // Filtering of the circles
-        pushBeginning<circleAvg>(meanCenter, averageCircle(circles), maxLengthCircleVector);
+        circleAvg average = averageCircle(circles);
+        pushBeginning<circleAvg>(meanCenter, average, maxLengthCircleVector);
+
+        // Calculate distance to marble
+        if (circles.size() > 0)
+        {
+            double distance = distanceToMarble(average, realRadius, f);
+            std::cout << "[NOTE] Distance to marble is:  " << distance << std::endl;
+            std::cout << "";
+        }
+
+        // Obtain the real distance through obtaining the position of each object
 
         // Using the LIDAR to find the marbles in the range
         // Identify the angle at which the marble is.
-
-        //double angle = 
         
 
         // Control of the robot based on the images
