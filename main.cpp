@@ -149,7 +149,7 @@ int main(int argc, char ** argv)
         cv::Laplacian(median, laplacian, CV_32F, 5);
         // median = median - 0.1*laplacian;
         median.convertTo(median, CV_8U);
-        cv::Canny(median, canny, 260, 300, 5, true);
+        cv::Canny(median, canny, 830, 800, 5, true);
         cv::GaussianBlur(canny, canny, cv::Size(3,3), 1);
         //median = median - 0.3*canny;
 
