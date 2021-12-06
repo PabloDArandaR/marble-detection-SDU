@@ -68,6 +68,12 @@ namespace comm
         public:
             void callbackMsg(ConstPosesStampedPtr &msg);
     };
+
+    class marbleInterface : public Interface<point>
+    {
+        public:
+            void callbackMsg(ConstPosesStampedPtr &msg);
+    };
 }
 
 #endif

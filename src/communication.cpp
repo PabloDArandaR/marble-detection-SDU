@@ -67,6 +67,21 @@ namespace comm
         received = true;
     }
 
+    void marbleInterface::callbackMsg(ConstPosesStampedPtr &msg)
+    {
+        for (int i = 0; i < msg->pose_size(); i++)
+        {
+            if (msg->pose(i).name() == "marble::marble::link::link")
+            {
+                this->elementReceived.x = msg->pose(i).position().x();
+                this->elementReceived.y = msg->pose(i).position().y();
+                this->elementReceived.z = msg->pose(i).position().z();
+            }
+        }
+
+        received = true;
+    }
+
 }
 
 #endif

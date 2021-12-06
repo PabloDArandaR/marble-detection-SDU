@@ -46,6 +46,7 @@ int main(int argc, char ** argv)
     comm::cameraInterface * camera (new comm::cameraInterface);
     comm::lidarInterface * lidar (new comm::lidarInterface);
     comm::poseInterface * poseRobot (new comm::poseInterface);
+    comm::marbleInterface * marble (new comm::marbleInterface);
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Argc check
@@ -67,6 +68,7 @@ int main(int argc, char ** argv)
     gazebo::transport::SubscriberPtr cameraSubscriber = node->Subscribe("~/pioneer2dx/camera/link/camera/image", &comm::cameraInterface::callbackMsg, camera);
     gazebo::transport::SubscriberPtr lidarSubscriber = node->Subscribe("~/pioneer2dx/hokuyo/link/laser/scan", &comm::lidarInterface::callbackMsg, lidar);
     gazebo::transport::SubscriberPtr poseSubscriber = node->Subscribe("/gazebo/default/pose/info", &comm::poseInterface::callbackMsg, poseRobot);
+    gazebo::transport::SubscriberPtr marbleSubscriber = node->Subscribe("/gazebo/default/marble/info", &comm::marbleInterface::callbackMsg, marble);
 
     // Capability to publish to reset the world
     gazebo::transport::PublisherPtr worldPublisher = node->Advertise<gazebo::msgs::WorldControl>("~/world_control");
@@ -147,15 +149,15 @@ int main(int argc, char ** argv)
         // Edge detection
         median.convertTo(median, CV_32F);
         cv::Laplacian(median, laplacian, CV_32F, 5);
-        // median = median - 0.1*laplacian;
+        median = median - 0.1*laplacian;
         median.convertTo(median, CV_8U);
         cv::Canny(median, canny, 830, 800, 5, true);
-        cv::GaussianBlur(canny, canny, cv::Size(3,3), 1);
+        //cv::GaussianBlur(canny, canny, cv::Size(3,3), 1);
         //median = median - 0.3*canny;
 
         // Segmentation/recognition of marbles
         cv::HoughCircles(canny , circles, cv::HOUGH_GRADIENT, 1,
-                 canny.rows/16,
+                 canny.rows/4,
                  param1, param2, minRadius, maxRadius 
         );
         std::cout << "Number of circles detected is: " << circles.size() << std::endl;
@@ -170,7 +172,10 @@ int main(int argc, char ** argv)
             double distance = distanceToMarble(average, realRadius, f);
             std::cout << "[NOTE] Calculated distance to marble is:  " << distance << std::endl;
             std::cout << "[NOTE] Real distance to marble is:        " << poseRobot->checkReceived().distance(marblePoint) << std::endl;
-            std::cout << "";
+            std::vector<double> calc = calcCoord(K, distance, circles[0][1], circles[0][0]);
+            std::cout << "Calculated points: x->" <<calc[0]<<"   y->"<<calc[1]<<"   z->"<<calc[2]<<std::endl;
+            //std::cout << poseRobot.x_center << " -- " << marblePoint.x_center << std::endl;
+            //std::cout << "";
         }
 
         // Obtain the real distance through obtaining the position of each object
