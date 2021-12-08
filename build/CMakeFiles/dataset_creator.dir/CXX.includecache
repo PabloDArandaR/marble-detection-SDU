@@ -6,7 +6,7 @@
 
 #IncludeRegexTransform: 
 
-/home/student/ItCV2/marble-detection-SDU/main.cpp
+/home/student/ItCV2/marble-detection-SDU/dataset_creator.cpp
 gazebo/gazebo_client.hh
 -
 gazebo/msgs/msgs.hh
@@ -24,6 +24,8 @@ stdlib.h
 math.h
 -
 list
+-
+fstream
 -
 src/communication.cpp
 /home/student/ItCV2/marble-detection-SDU/src/communication.cpp

@@ -56,7 +56,7 @@ namespace comm
     {
         for (int i = 0; i < msg->pose_size(); i++)
         {
-            if (msg->pose(i).name() == "pioneer2dx::camera::link")
+            if (msg->pose(i).name() == "pioneer2dx")
             {
                 this->elementReceived.x = msg->pose(i).position().x();
                 this->elementReceived.y = msg->pose(i).position().y();

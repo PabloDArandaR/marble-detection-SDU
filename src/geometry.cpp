@@ -1,10 +1,35 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
 #include "vectorMod.cpp"
+#include "math.h"
+
+std::vector<std::string> split(const std::string &text, char sep) {
+    std::vector<std::string> tokens;
+    std::size_t start = 0, end = 0;
+    while ((end = text.find(sep, start)) != std::string::npos) {
+        if (end != start) {
+          tokens.push_back(text.substr(start, end - start));
+        }
+        start = end + 1;
+    }
+    if (end != start) {
+       tokens.push_back(text.substr(start));
+    }
+    return tokens;
+}
 
 double distanceToMarble(circleAvg input, float realRadius, float f)
 {
     return {(f/input.radius)*realRadius};
+}
+
+double veryCustomDistance(double x1, double y1, double z1, double x2, double y2, double z2)
+{
+    double x = (x1-x2)*(x1-x2);
+    double y = (y1-y2)*(y1-y2);
+    double z = (z1-z2)*(z1-z2);
+
+    return sqrt(x + y + z);
 }
 
 std::vector<double> calcCoord(cv::Matx33f K, double depth, int dx, int dy)

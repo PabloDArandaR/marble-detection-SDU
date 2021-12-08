@@ -53,6 +53,7 @@ CMAKE_BINARY_DIR = /home/student/ItCV2/marble-detection-SDU/build
 # Directory level rules for the build root directory
 
 # The main recursive "all" target.
+all: CMakeFiles/dataset_creator.dir/all
 all: CMakeFiles/robot_control.dir/all
 
 .PHONY : all
@@ -63,9 +64,37 @@ preinstall:
 .PHONY : preinstall
 
 # The main recursive "clean" target.
+clean: CMakeFiles/dataset_creator.dir/clean
 clean: CMakeFiles/robot_control.dir/clean
 
 .PHONY : clean
+
+#=============================================================================
+# Target rules for target CMakeFiles/dataset_creator.dir
+
+# All Build rule for target.
+CMakeFiles/dataset_creator.dir/all:
+	$(MAKE) -f CMakeFiles/dataset_creator.dir/build.make CMakeFiles/dataset_creator.dir/depend
+	$(MAKE) -f CMakeFiles/dataset_creator.dir/build.make CMakeFiles/dataset_creator.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/student/ItCV2/marble-detection-SDU/build/CMakeFiles --progress-num=1,2 "Built target dataset_creator"
+.PHONY : CMakeFiles/dataset_creator.dir/all
+
+# Build rule for subdir invocation for target.
+CMakeFiles/dataset_creator.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/student/ItCV2/marble-detection-SDU/build/CMakeFiles 2
+	$(MAKE) -f CMakeFiles/Makefile2 CMakeFiles/dataset_creator.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/student/ItCV2/marble-detection-SDU/build/CMakeFiles 0
+.PHONY : CMakeFiles/dataset_creator.dir/rule
+
+# Convenience name for target.
+dataset_creator: CMakeFiles/dataset_creator.dir/rule
+
+.PHONY : dataset_creator
+
+# clean rule for target.
+CMakeFiles/dataset_creator.dir/clean:
+	$(MAKE) -f CMakeFiles/dataset_creator.dir/build.make CMakeFiles/dataset_creator.dir/clean
+.PHONY : CMakeFiles/dataset_creator.dir/clean
 
 #=============================================================================
 # Target rules for target CMakeFiles/robot_control.dir
@@ -74,7 +103,7 @@ clean: CMakeFiles/robot_control.dir/clean
 CMakeFiles/robot_control.dir/all:
 	$(MAKE) -f CMakeFiles/robot_control.dir/build.make CMakeFiles/robot_control.dir/depend
 	$(MAKE) -f CMakeFiles/robot_control.dir/build.make CMakeFiles/robot_control.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/student/ItCV2/marble-detection-SDU/build/CMakeFiles --progress-num=1,2 "Built target robot_control"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/student/ItCV2/marble-detection-SDU/build/CMakeFiles --progress-num=3,4 "Built target robot_control"
 .PHONY : CMakeFiles/robot_control.dir/all
 
 # Build rule for subdir invocation for target.

@@ -69,8 +69,8 @@ rebuild_cache/fast: rebuild_cache
 
 # Special rule for the target edit_cache
 edit_cache:
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "No interactive CMake dialog available..."
-	/usr/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Running CMake cache editor..."
+	/usr/bin/cmake-gui -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR)
 .PHONY : edit_cache
 
 # Special rule for the target edit_cache
@@ -111,6 +111,19 @@ depend:
 .PHONY : depend
 
 #=============================================================================
+# Target rules for targets named dataset_creator
+
+# Build rule for target.
+dataset_creator: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 dataset_creator
+.PHONY : dataset_creator
+
+# fast build rule for target.
+dataset_creator/fast:
+	$(MAKE) -f CMakeFiles/dataset_creator.dir/build.make CMakeFiles/dataset_creator.dir/build
+.PHONY : dataset_creator/fast
+
+#=============================================================================
 # Target rules for targets named robot_control
 
 # Build rule for target.
@@ -122,6 +135,33 @@ robot_control: cmake_check_build_system
 robot_control/fast:
 	$(MAKE) -f CMakeFiles/robot_control.dir/build.make CMakeFiles/robot_control.dir/build
 .PHONY : robot_control/fast
+
+dataset_creator.o: dataset_creator.cpp.o
+
+.PHONY : dataset_creator.o
+
+# target to build an object file
+dataset_creator.cpp.o:
+	$(MAKE) -f CMakeFiles/dataset_creator.dir/build.make CMakeFiles/dataset_creator.dir/dataset_creator.cpp.o
+.PHONY : dataset_creator.cpp.o
+
+dataset_creator.i: dataset_creator.cpp.i
+
+.PHONY : dataset_creator.i
+
+# target to preprocess a source file
+dataset_creator.cpp.i:
+	$(MAKE) -f CMakeFiles/dataset_creator.dir/build.make CMakeFiles/dataset_creator.dir/dataset_creator.cpp.i
+.PHONY : dataset_creator.cpp.i
+
+dataset_creator.s: dataset_creator.cpp.s
+
+.PHONY : dataset_creator.s
+
+# target to generate assembly for a file
+dataset_creator.cpp.s:
+	$(MAKE) -f CMakeFiles/dataset_creator.dir/build.make CMakeFiles/dataset_creator.dir/dataset_creator.cpp.s
+.PHONY : dataset_creator.cpp.s
 
 main.o: main.cpp.o
 
@@ -158,7 +198,11 @@ help:
 	@echo "... depend"
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
+	@echo "... dataset_creator"
 	@echo "... robot_control"
+	@echo "... dataset_creator.o"
+	@echo "... dataset_creator.i"
+	@echo "... dataset_creator.s"
 	@echo "... main.o"
 	@echo "... main.i"
 	@echo "... main.s"

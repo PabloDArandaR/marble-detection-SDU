@@ -7,6 +7,7 @@
 #include <stdlib.h>  // for strtol
 #include <math.h>
 #include <list>
+#include <fstream>
 
 #include "src/communication.cpp"
 #include "src/vectorMod.cpp"
@@ -18,6 +19,8 @@ const int key_up = 82;
 const int key_down = 84;
 const int key_right = 83;
 const int key_esc = 27;
+const int key_a = 97;
+const int key_d = 100;
 
 const int maxParam1 {300};
 const int minParam1 {1};
@@ -34,6 +37,12 @@ const float width {320.0}, height {240.0}, fov {1.047};
 int main(int argc, char ** argv)
 {
     // Declaration of global variables
+
+    std::ofstream myFile("pisalau.csv");
+
+    float speed = 0.0;
+    float dir = 0.0;
+
     double stdDev {0.02};
     const double mean {0};
     const int kernel_size {3};
@@ -70,6 +79,9 @@ int main(int argc, char ** argv)
     gazebo::transport::SubscriberPtr poseSubscriber = node->Subscribe("/gazebo/default/pose/info", &comm::poseInterface::callbackMsg, poseRobot);
     gazebo::transport::SubscriberPtr marbleSubscriber = node->Subscribe("/gazebo/default/marble/info", &comm::marbleInterface::callbackMsg, marble);
 
+    gazebo::transport::PublisherPtr movementPublisher =
+    node->Advertise<gazebo::msgs::Pose>("~/pioneer2dx/vel_cmd");
+
     // Capability to publish to reset the world
     gazebo::transport::PublisherPtr worldPublisher = node->Advertise<gazebo::msgs::WorldControl>("~/world_control");
     gazebo::msgs::WorldControl controlMessage;
@@ -102,9 +114,11 @@ int main(int argc, char ** argv)
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Control loop
+    int cntr = 0;
     while(true)
     {
-        std::cout << " ---------------------------------------------------------------------------\n";
+        std::string savingName = "img" + std::to_string(++cntr) + ".jpg";
+        //std::cout << " ---------------------------------------------------------------------------\n";
 
         // Declare the local variables
         cv::Mat gauss, median, blurred, sharp, laplacianGauss, laplacianBlur, laplacianMedian, laplacian, used, original, undistorted, canny, hsv;
@@ -160,22 +174,76 @@ int main(int argc, char ** argv)
                  canny.rows/16,
                  param1, param2, minRadius, maxRadius 
         );
-        std::cout << "Number of circles detected is: " << circles.size() << std::endl;
+        //std::cout << "Number of circles detected is: " << circles.size() << std::endl;
 
         // Filtering of the circles
         circleAvg average = averageCircle(circles);
         pushBeginning<circleAvg>(meanCenter, average, maxLengthCircleVector);
 
+        double distance, rdistance;
+
+        // Generate a pose
+        ignition::math::Pose3d pose(double(speed), 0, 0, 0, 0, double(dir));
+
+        // Convert to a pose message
+        gazebo::msgs::Pose msg;
+        gazebo::msgs::Set(&msg, pose);
+        movementPublisher->Publish(msg);
+
         // Calculate distance to marble
         if (circles.size() > 0)
         {
-            double distance = distanceToMarble(average, realRadius, f);
-            std::cout << "[NOTE] Calculated distance to marble is:  " << distance << std::endl;
-            std::cout << "[NOTE] Real distance to marble is:        " << poseRobot->checkReceived().distance(marblePoint) << std::endl;
+            distance = distanceToMarble(average, realRadius, f);
+            //ignition::math::Vector3<double> position = pose.Pos();
+            //double pos[3] = {position.X(), position.Y(), position.Z()};
+            //std::cout << pos[0] << "  --  "<< pos[1] << "  --  "<< pos[2] << std::endl;
+            //rdistance = veryCustomDistance(pos[0], pos[1], pos[3], 5, 0, 0.5);
+            rdistance = poseRobot->checkReceived().distance(marblePoint);
+            //std::cout << "[NOTE] Calculated distance to marble is:  " << distance << std::endl;
+            //std::cout << "[NOTE] Real distance to marble is:        " << poseRobot->checkReceived().distance(marblePoint) << std::endl;
             std::vector<double> calc = calcCoord(K, distance, circles[0][1], circles[0][0]);
-            std::cout << "Calculated points: x->" <<calc[0]<<"   y->"<<calc[1]<<"   z->"<<calc[2]<<std::endl;
+            //std::cout << "Calculated points: x->" <<calc[0]<<"   y->"<<calc[1]<<"   z->"<<calc[2]<<std::endl;
             //std::cout << poseRobot.x_center << " -- " << marblePoint.x_center << std::endl;
             //std::cout << "";
+        }
+        else
+        {
+            distance = 0;
+            rdistance = 0;
+        }
+
+        if ((key == key_up) && (speed <= 1.2f))
+        {
+            speed += 0.05;
+        }
+        else if ((key == key_down) && (speed >= -1.2f))
+        {
+            speed -= 0.05;
+        }
+        else if ((key == key_right) && (dir <= 0.4f))
+        {
+            dir += 0.05;
+        }
+        else if ((key == key_left) && (dir >= -0.4f))
+        {
+            dir -= 0.05;
+        }
+        else 
+        {
+                speed *= 0.9;
+                dir *= 0.9;
+        }
+
+        if (key == key_a)
+        {
+            myFile << std::to_string(circles.size()) << ",1," << std::to_string(distance) << "," << std::to_string(rdistance) << "\n";
+            std::cout << std::to_string(circles.size()) << ",1," << std::to_string(distance) << "," << std::to_string(rdistance) << "\n";
+        }
+
+        if (key == key_d)
+        {
+            myFile << std::to_string(circles.size()) << ",0," << std::to_string(distance) << "," << std::to_string(rdistance) << "\n";
+            std::cout << std::to_string(circles.size()) << ",0," << std::to_string(distance) << "," << std::to_string(rdistance) << "\n";
         }
 
         // Obtain the real distance through obtaining the position of each object
@@ -208,25 +276,27 @@ int main(int argc, char ** argv)
             mutex.lock();
             cv::imshow("Undistorted", undistorted);
             mutex.unlock(); */
-            mutex.lock();
-            cv::imshow("Median", median);
-            mutex.unlock();
+            //mutex.lock();
+            //cv::imshow("Median", median);
+            //mutex.unlock();
             /* mutex.lock();
             cv::imshow("Laplacian", laplacian);
             mutex.unlock(); */
             mutex.lock();
             cv::imshow("Average Circle", avgCircleImage);
             mutex.unlock();
-            mutex.lock();
-            cv::imshow("Canny edge", canny);
-            mutex.unlock(); 
+            //mutex.lock();
+            //cv::imshow("Canny edge", canny);
+            //mutex.unlock(); 
         }
 
-        std::cout << " [NOTE] Type of the relevant message: " << gazebo::transport::getTopicMsgType("/gazebo/default/pose/info") << std::endl;
+        //std::cout << " [NOTE] Type of the relevant message: " << gazebo::transport::getTopicMsgType("/gazebo/default/pose/info") << std::endl;
     }
 
     // Turn off gazebo
     gazebo::client::shutdown();
+
+    myFile.close();
 
     return 0;
 }
