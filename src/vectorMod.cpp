@@ -26,6 +26,17 @@ circle lowPassFilter(std::vector<circleAvg> inputs, float cutoff, float sampleFr
     return result;
 }
 
+circleAvg complementaryFilter(circleAvg inputs, circleAvg past_circle, float beta)
+{
+    circleAvg result;
+
+    result.x_center = beta * past_circle.x_center + (1 - beta) * inputs.x_center;
+    result.y_center = beta * past_circle.y_center + (1 - beta) * inputs.y_center;
+    result.radius = beta * past_circle.radius + (1 - beta) * inputs.radius;
+    
+    return result;
+}
+
 template <typename T>
 void pushBeginning(std::vector<T> & inputVector, T inputValue, int maxLength)
 {

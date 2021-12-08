@@ -3,6 +3,9 @@
 #include "vectorMod.cpp"
 #include "math.h"
 
+#ifndef GEOMETRY_DEFINE_CPP
+#define GEOMETRY_DEFINE_CPP
+
 std::vector<std::string> split(const std::string &text, char sep) {
     std::vector<std::string> tokens;
     std::size_t start = 0, end = 0;
@@ -31,6 +34,19 @@ double veryCustomDistance(double x1, double y1, double z1, double x2, double y2,
 
     return sqrt(x + y + z);
 }
+
+double angleToPointRad(float input, int width, float f)
+{
+    return {atan((width/2 - input)/f)};
+}
+
+
+double angleToPointDeg(float input, int width, float f)
+{
+    double pi = 3.14159265;
+    return {angleToPointRad(input, width, f)*180/pi};
+}
+
 
 std::vector<double> calcCoord(cv::Matx33f K, double depth, int dx, int dy)
 {
@@ -61,3 +77,5 @@ std::vector<double> calcCoord(cv::Matx33f K, double depth, int dx, int dy)
 
     return calc;
 }
+
+#endif

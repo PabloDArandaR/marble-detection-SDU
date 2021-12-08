@@ -10,11 +10,17 @@
 
 namespace comm
 {
+    struct lidarRanges {
+        float range;
+        float angle;
+    };
+
     struct lidarMsg
     {
         float angle_min, angle_increment, range_min, range_max;
         int nranges, nintensities;
-        std::vector<int> ranges;
+        std::vector<lidarRanges> ranges;
+        cv::Mat im;
     };
 
     struct point
@@ -61,12 +67,16 @@ namespace comm
     {
         public:
             void callbackMsg(ConstLaserScanStampedPtr &msg);
+
+            
     };
 
     class poseInterface : public Interface<point>
     {
         public:
             void callbackMsg(ConstPosesStampedPtr &msg);
+
+            point front;
     };
 
     class marbleInterface : public Interface<point>

@@ -14,5 +14,6 @@ include_directories(${GAZEBO_PROTO_INCLUDE_DIRS} ${GAZEBO_INCLUDE_DIRS})
 add_executable(robot_control main.cpp)
 target_link_libraries(robot_control ${OpenCV_LIBS} ${GAZEBO_PROTO_LIBRARIES} ${GAZEBO_LIBRARIES})
 
+
 add_executable(dataset_creator dataset_creator.cpp)
 target_link_libraries(dataset_creator ${OpenCV_LIBS} ${GAZEBO_PROTO_LIBRARIES} ${GAZEBO_LIBRARIES})

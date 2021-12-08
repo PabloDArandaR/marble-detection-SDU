@@ -11,6 +11,11 @@
 #include "src/communication.cpp"
 #include "src/vectorMod.cpp"
 #include "src/geometry.cpp"
+#include "src/lidarManager.cpp"
+
+#ifndef PI
+#define PI 3.14159265
+#endif
 
 static boost::mutex mutex;
 const int key_left = 81;
@@ -70,12 +75,19 @@ int main(int argc, char ** argv)
     gazebo::transport::SubscriberPtr poseSubscriber = node->Subscribe("/gazebo/default/pose/info", &comm::poseInterface::callbackMsg, poseRobot);
     gazebo::transport::SubscriberPtr marbleSubscriber = node->Subscribe("/gazebo/default/marble/info", &comm::marbleInterface::callbackMsg, marble);
 
+    // Publish to the robot vel_cmd topic
+    gazebo::transport::PublisherPtr movementPublisher =
+        node->Advertise<gazebo::msgs::Pose>("~/pioneer2dx/vel_cmd");
+
     // Capability to publish to reset the world
     gazebo::transport::PublisherPtr worldPublisher = node->Advertise<gazebo::msgs::WorldControl>("~/world_control");
     gazebo::msgs::WorldControl controlMessage;
     controlMessage.mutable_reset()->set_all(true);
     worldPublisher->WaitForConnection();
     worldPublisher->Publish(controlMessage);
+
+    float speed = 0.0;
+    float dir = 0.0;
 
     // TODO Create publisher to publish the location of the closest marbel
     /* std::list<std::string> listOfTopics = gazebo::transport::getAdvertisedTopics();
@@ -104,14 +116,12 @@ int main(int argc, char ** argv)
     // Control loop
     while(true)
     {
-        std::cout << " ---------------------------------------------------------------------------\n";
-
         // Declare the local variables
         cv::Mat gauss, median, blurred, sharp, laplacianGauss, laplacianBlur, laplacianMedian, laplacian, used, original, undistorted, canny, hsv;
         std::vector<cv::Vec3f> circles, circlesLap;
         comm::lidarMsg lidarFrame;
 
-        // Make it capable to read the image 
+        // Make it capable to read the image
         mutex.lock();
         int key = cv::waitKey(1);
         mutex.unlock();
@@ -121,6 +131,26 @@ int main(int argc, char ** argv)
         {
             break;
         }
+
+        if ((key == key_up) && (speed <= 1.2f))
+            speed += 0.05;
+        else if ((key == key_down) && (speed >= -1.2f))
+            speed -= 0.05;
+        else if ((key == key_right) && (dir <= 0.4f))
+            dir += 0.05;
+        else if ((key == key_left) && (dir >= -0.4f))
+            dir -= 0.05;
+        else {
+        // slow down
+        //      speed *= 0.1;
+        //      dir *= 0.1;
+        }
+
+        // Generate a pose
+        ignition::math::Pose3d pose(double(speed), 0, 0, 0, 0, double(dir));
+        gazebo::msgs::Pose msg;
+        gazebo::msgs::Set(&msg, pose);
+        movementPublisher->Publish(msg);
 
         //std::cout << " [NOTE] The list of possible messages is:  " << gazebo::transport::getAdvertisedTopics() << std::endl;
         //std::cout << " [NOTE] The message that is begin published is of type:  " <<  << std::endl;
@@ -143,35 +173,33 @@ int main(int argc, char ** argv)
         cv::cvtColor(undistorted, image_gray, cv::COLOR_BGR2GRAY);
 
         // Basic filterings to check which one is better
-        cv::medianBlur(undistorted, median, kernel_size);
-        cv::cvtColor(median, median, cv::COLOR_BGR2GRAY); // For further analysis
-
-        // Edge detection
-        median.convertTo(median, CV_32F);
-        cv::Laplacian(median, laplacian, CV_32F, 5);
-        median = median - 0.1*laplacian;
-        median.convertTo(median, CV_8U);
-        cv::Canny(median, canny, 830, 800, 5, true);
-        //cv::GaussianBlur(canny, canny, cv::Size(3,3), 1);
-        //median = median - 0.3*canny;
+         cv::GaussianBlur(image_gray, median, cv::Size(9,9), 1.7, 1.7);
 
         // Segmentation/recognition of marbles
-        cv::HoughCircles(canny , circles, cv::HOUGH_GRADIENT, 1,
-                 canny.rows/16,
-                 param1, param2, minRadius, maxRadius 
+        cv::HoughCircles(median , circles, cv::HOUGH_GRADIENT, 1,
+                 median.rows,
+                // 13, 19, minRadius, maxRadius
+                 14, 19.5, 10, 200
         );
         std::cout << "Number of circles detected is: " << circles.size() << std::endl;
 
         // Filtering of the circles
         circleAvg average = averageCircle(circles);
         pushBeginning<circleAvg>(meanCenter, average, maxLengthCircleVector);
+        std::cout << "[NOTE] Real distance to marble is:        " << poseRobot->checkReceived().distance(marblePoint) - realRadius << std::endl;
+        
 
         // Calculate distance to marble
         if (circles.size() > 0)
-        {
+        {   double lidar_distance = lidarInfo(lidarFrame, width, f, average);
+            std::cout << "[NOTE] Lidar distance to marble is:        " << lidar_distance << std::endl;
+
             double distance = distanceToMarble(average, realRadius, f);
+            double angle = angleToPointDeg(average.x_center, width, f);
+
             std::cout << "[NOTE] Calculated distance to marble is:  " << distance << std::endl;
-            std::cout << "[NOTE] Real distance to marble is:        " << poseRobot->checkReceived().distance(marblePoint) << std::endl;
+            std::cout << "[NOTE] Calculated angle to marble's center is:  " << angle << std::endl;
+
             std::vector<double> calc = calcCoord(K, distance, circles[0][1], circles[0][0]);
             std::cout << "Calculated points: x->" <<calc[0]<<"   y->"<<calc[1]<<"   z->"<<calc[2]<<std::endl;
             //std::cout << poseRobot.x_center << " -- " << marblePoint.x_center << std::endl;
@@ -182,7 +210,7 @@ int main(int argc, char ** argv)
 
         // Using the LIDAR to find the marbles in the range
         // Identify the angle at which the marble is.
-        
+
 
         // Control of the robot based on the images
 
@@ -191,14 +219,14 @@ int main(int argc, char ** argv)
 
         if (show_image){
             // Draw circles detected in each image
-            cv::Mat avgCircleImage = median.clone();
+            cv::Mat avgCircleImage = undistorted.clone();
 
             for (int i = 0; i < circles.size(); i++)
             {
                 // circle center
-                cv::circle( median, cv::Point(circles[i][0], circles[i][1]), 1, cv::Scalar(0,100,100), 3, cv::LINE_AA);
+                cv::circle( undistorted, cv::Point(circles[i][0], circles[i][1]), 1, cv::Scalar(0,100,100), 3, cv::LINE_AA);
                 // circle outline
-                cv::circle( median, cv::Point(circles[i][0], circles[i][1]), circles[i][2], cv::Scalar(255,0,255), 1, cv::LINE_AA);
+                cv::circle( undistorted, cv::Point(circles[i][0], circles[i][1]), circles[i][2], cv::Scalar(255,0,255), 1, cv::LINE_AA);
             }
             cv::circle(avgCircleImage, cv::Point(meanCenter[maxLengthCircleVector-1].x_center, meanCenter[maxLengthCircleVector-1].y_center), meanCenter[maxLengthCircleVector-1].radius, cv::Scalar(255,0,255), 1, cv::LINE_AA);
 
@@ -209,17 +237,15 @@ int main(int argc, char ** argv)
             cv::imshow("Undistorted", undistorted);
             mutex.unlock(); */
             mutex.lock();
+            cv::imshow("Lidar", lidarFrame.im);
+            mutex.unlock();
+
+            mutex.lock();
             cv::imshow("Median", median);
             mutex.unlock();
-            /* mutex.lock();
-            cv::imshow("Laplacian", laplacian);
-            mutex.unlock(); */
             mutex.lock();
             cv::imshow("Average Circle", avgCircleImage);
             mutex.unlock();
-            mutex.lock();
-            cv::imshow("Canny edge", canny);
-            mutex.unlock(); 
         }
 
         std::cout << " [NOTE] Type of the relevant message: " << gazebo::transport::getTopicMsgType("/gazebo/default/pose/info") << std::endl;
