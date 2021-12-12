@@ -12,6 +12,11 @@
 #include "src/communication.cpp"
 #include "src/vectorMod.cpp"
 #include "src/geometry.cpp"
+#include "src/lidarManager.cpp"
+
+#ifndef PI
+#define PI 3.14159265
+#endif
 
 static boost::mutex mutex;
 const int key_left = 81;
@@ -21,6 +26,9 @@ const int key_right = 83;
 const int key_esc = 27;
 const int key_a = 97;
 const int key_d = 100;
+
+const float mean_vs = 0.240167305084746;
+const float mean_lr = 0.731315118644068;
 
 const int maxParam1 {300};
 const int minParam1 {1};
@@ -79,6 +87,7 @@ int main(int argc, char ** argv)
     gazebo::transport::SubscriberPtr poseSubscriber = node->Subscribe("/gazebo/default/pose/info", &comm::poseInterface::callbackMsg, poseRobot);
     gazebo::transport::SubscriberPtr marbleSubscriber = node->Subscribe("/gazebo/default/marble/info", &comm::marbleInterface::callbackMsg, marble);
 
+    // Publish to the robot vel_cmd topic
     gazebo::transport::PublisherPtr movementPublisher =
     node->Advertise<gazebo::msgs::Pose>("~/pioneer2dx/vel_cmd");
 
@@ -157,30 +166,22 @@ int main(int argc, char ** argv)
         cv::cvtColor(undistorted, image_gray, cv::COLOR_BGR2GRAY);
 
         // Basic filterings to check which one is better
-        cv::medianBlur(undistorted, median, kernel_size);
-        cv::cvtColor(median, median, cv::COLOR_BGR2GRAY); // For further analysis
-
-        // Edge detection
-        median.convertTo(median, CV_32F);
-        cv::Laplacian(median, laplacian, CV_32F, 5);
-        median = median - 0.1*laplacian;
-        median.convertTo(median, CV_8U);
-        cv::Canny(median, canny, 830, 800, 5, true);
-        //cv::GaussianBlur(canny, canny, cv::Size(3,3), 1);
-        //median = median - 0.3*canny;
+         cv::GaussianBlur(image_gray, median, cv::Size(9,9), 1.7, 1.7);
 
         // Segmentation/recognition of marbles
-        cv::HoughCircles(canny , circles, cv::HOUGH_GRADIENT, 1,
-                 canny.rows/16,
-                 param1, param2, minRadius, maxRadius 
+        cv::HoughCircles(median , circles, cv::HOUGH_GRADIENT, 1,
+                 median.rows,
+                // 13, 19, minRadius, maxRadius
+                 14, 19.5, 10, 200
         );
         //std::cout << "Number of circles detected is: " << circles.size() << std::endl;
 
         // Filtering of the circles
         circleAvg average = averageCircle(circles);
         pushBeginning<circleAvg>(meanCenter, average, maxLengthCircleVector);
-
-        double distance, rdistance;
+        //std::cout << "[NOTE] Real distance to marble is:        " << poseRobot->checkReceived().distance(marblePoint) - realRadius << std::endl;
+        
+        double distance, rdistance, ldistance, angle;
 
         // Generate a pose
         ignition::math::Pose3d pose(double(speed), 0, 0, 0, 0, double(dir));
@@ -193,7 +194,9 @@ int main(int argc, char ** argv)
         // Calculate distance to marble
         if (circles.size() > 0)
         {
-            distance = distanceToMarble(average, realRadius, f);
+            ldistance = lidarInfo(lidarFrame, width, f, average) + mean_lr;
+            distance = distanceToMarble(average, realRadius, f) + mean_vs;
+            angle = angleToPointDeg(average.x_center, width, f);
             //ignition::math::Vector3<double> position = pose.Pos();
             //double pos[3] = {position.X(), position.Y(), position.Z()};
             //std::cout << pos[0] << "  --  "<< pos[1] << "  --  "<< pos[2] << std::endl;
@@ -210,6 +213,7 @@ int main(int argc, char ** argv)
         {
             distance = 0;
             rdistance = 0;
+            ldistance = lidarInfo(lidarFrame, width, f, average);
         }
 
         if ((key == key_up) && (speed <= 1.2f))
@@ -236,14 +240,15 @@ int main(int argc, char ** argv)
 
         if (key == key_a)
         {
-            myFile << std::to_string(circles.size()) << ",1," << std::to_string(distance) << "," << std::to_string(rdistance) << "\n";
-            std::cout << std::to_string(circles.size()) << ",1," << std::to_string(distance) << "," << std::to_string(rdistance) << "\n";
+            myFile << std::to_string(circles.size()) << ",1," << std::to_string(distance) << "," << std::to_string(rdistance) << "," << std::to_string(ldistance) << "\n";
+            std::cout << std::to_string(circles.size()) << ",1," << std::to_string(distance) << "," << std::to_string(rdistance) << "," << std::to_string(ldistance) << "\n";
         }
 
         if (key == key_d)
         {
-            myFile << std::to_string(circles.size()) << ",0," << std::to_string(distance) << "," << std::to_string(rdistance) << "\n";
-            std::cout << std::to_string(circles.size()) << ",0," << std::to_string(distance) << "," << std::to_string(rdistance) << "\n";
+            cntr++;
+            myFile << std::to_string(circles.size()) << ",0," << std::to_string(distance) << "," << std::to_string(rdistance) << "," << std::to_string(ldistance) << "\n";
+            std::cout << std::to_string(circles.size()) << ",0," << std::to_string(distance) << "," << std::to_string(rdistance) << "," << std::to_string(ldistance) << "\n";
         }
 
         // Obtain the real distance through obtaining the position of each object
@@ -276,18 +281,16 @@ int main(int argc, char ** argv)
             mutex.lock();
             cv::imshow("Undistorted", undistorted);
             mutex.unlock(); */
-            //mutex.lock();
-            //cv::imshow("Median", median);
-            //mutex.unlock();
-            /* mutex.lock();
-            cv::imshow("Laplacian", laplacian);
-            mutex.unlock(); */
+            mutex.lock();
+            cv::imshow("Lidar", lidarFrame.im);
+            mutex.unlock();
+
+            mutex.lock();
+            cv::imshow("Median", median);
+            mutex.unlock();
             mutex.lock();
             cv::imshow("Average Circle", avgCircleImage);
             mutex.unlock();
-            //mutex.lock();
-            //cv::imshow("Canny edge", canny);
-            //mutex.unlock(); 
         }
 
         //std::cout << " [NOTE] Type of the relevant message: " << gazebo::transport::getTopicMsgType("/gazebo/default/pose/info") << std::endl;

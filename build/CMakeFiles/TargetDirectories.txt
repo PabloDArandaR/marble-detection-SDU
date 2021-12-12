@@ -1,0 +1,4 @@
+/home/student/ItCV2/marble-detection-SDU/build/CMakeFiles/rebuild_cache.dir
+/home/student/ItCV2/marble-detection-SDU/build/CMakeFiles/edit_cache.dir
+/home/student/ItCV2/marble-detection-SDU/build/CMakeFiles/dataset_creator.dir
+/home/student/ItCV2/marble-detection-SDU/build/CMakeFiles/robot_control.dir
